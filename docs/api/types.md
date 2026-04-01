@@ -62,10 +62,16 @@
 - `description: str`：给人看的说明
 - `prompt: str`：该 agent 的系统/任务提示词主体
 - `tools: list[str] | None`：允许/使用的工具名列表（语义依赖 CLI 对 agents 的实现）
-- `model: Literal["sonnet","opus","haiku","inherit"] | None`：模型选择（或继承）
+- `disallowedTools: list[str] | None`：该 agent 显式禁用的工具名列表（camelCase 字段名与 CLI/控制协议对齐）
+- `model: str | None`：模型选择（既可用别名如 `"sonnet"` / `"opus"` / `"haiku"` / `"inherit"`，也可用完整 model id；具体支持取决于 CLI/平台）
 - `skills: list[str] | None`：技能列表（语义依赖 CLI）
 - `memory: Literal["user","project","local"] | None`：记忆层级
 - `mcpServers: list[str | dict[str, Any]] | None`：MCP servers（可用 server 名或 inline 配置）
+- `initialPrompt: str | None`：agent 的初始提示（用于某些 CLI agent 工作流；语义依赖 CLI）
+- `maxTurns: int | None`：限制该 agent 最多对话轮数（语义依赖 CLI）
+- `background: bool | None`：是否允许后台执行（语义依赖 CLI）
+- `effort: Literal["low","medium","high","max"] | int | None`：推理/努力程度提示（或数值；语义依赖 CLI/模型）
+- `permissionMode: PermissionMode | None`：该 agent 的默认权限模式（若 CLI 支持按 agent 覆盖）
 
 ---
 

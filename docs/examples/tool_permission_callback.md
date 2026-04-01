@@ -41,7 +41,7 @@
 
 **重要限制（从 SDK 行为推导）**
 
-- 当你使用 `can_use_tool` 时，`ClaudeSDKClient.connect()` 要求 prompt 为 streaming（见 `docs/api/client.md` 里的限制）；示例这里用 `ClaudeSDKClient(options)` 是正确方向。
+- 当你使用 `can_use_tool` 时，`ClaudeSDKClient.connect()` 要求 prompt 为 streaming（见 [docs/api/client.md](../api/client.md) 里的限制）；示例这里用 `ClaudeSDKClient(options)` 是正确方向。
 
 ---
 

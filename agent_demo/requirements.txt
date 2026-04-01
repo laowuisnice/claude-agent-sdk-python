@@ -1,0 +1,6 @@
+# Install the SDK from the repo root first, e.g.:
+#   pip install -e .
+# Optional (same Gradio pin as pyproject [project.optional-dependencies] demo):
+#   pip install -e ".[demo]"
+#
+gradio>=6.0,<7

@@ -117,7 +117,7 @@
 
 ---
 
-### `async def set_permission_mode(self, mode: str) -> None`
+### `async def set_permission_mode(self, mode: PermissionMode) -> None`
 
 **用途**
 
@@ -125,7 +125,7 @@
 
 **mode 常见值**
 
-- `"default"` / `"acceptEdits"` / `"bypassPermissions"`
+- `"default"` / `"acceptEdits"` / `"plan"` / `"bypassPermissions"` / `"dontAsk"`
 
 ---
 
@@ -192,7 +192,19 @@
 
 **返回**
 
-- `McpStatusResponse`（形状见 `types.md`：包含 `mcpServers: list[McpServerStatus]`）。
+- `McpStatusResponse`（形状见 [types.md](types.md)：包含 `mcpServers: list[McpServerStatus]`）。
+
+---
+
+### `async def get_context_usage(self) -> ContextUsageResponse`
+
+**用途**
+
+- 获取当前 context window 的使用情况拆分（与 CLI 的 `/context` 展示一致），便于做成本/可观测性分析。
+
+**返回**
+
+- `ContextUsageResponse`：包含按类别的 token 统计、总使用量、模型信息，以及 MCP tools / memory files / agents 的细分（详见 `types.py` 中同名 TypedDict）。
 
 ---
 

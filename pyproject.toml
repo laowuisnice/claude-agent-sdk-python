@@ -39,6 +39,10 @@ dev = [
     "mypy>=1.0.0",
     "ruff>=0.1.0",
 ]
+# Gradio UI demo (agent_demo/); not part of the core SDK install.
+demo = [
+    "gradio>=6.0,<7",
+]
 
 [project.urls]
 Homepage = "https://github.com/anthropics/claude-agent-sdk-python"

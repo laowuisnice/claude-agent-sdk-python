@@ -7,17 +7,17 @@
 
 ## 目录
 
-- `__init__.md`：顶层导出、SDK MCP（进程内工具）相关：`SdkMcpTool`、`tool()`、`create_sdk_mcp_server()`
-- `query.md`：一次性查询入口：`query()`
-- `client.md`：交互式客户端：`ClaudeSDKClient`（及其所有公开方法）
-- `types.md`：核心类型与配置：`ClaudeAgentOptions`、消息/内容块、Hooks、权限、MCP 配置等
-- `errors.md`：错误类型：`ClaudeSDKError` 等
+- [__init__.md](__init__.md)：顶层导出、SDK MCP（进程内工具）相关：`SdkMcpTool`、`tool()`、`create_sdk_mcp_server()`
+- [query.md](query.md)：一次性查询入口：`query()`
+- [client.md](client.md)：交互式客户端：`ClaudeSDKClient`（及其所有公开方法）
+- [types.md](types.md)：核心类型与配置：`ClaudeAgentOptions`、消息/内容块、Hooks、权限、MCP 配置等
+- [errors.md](errors.md)：错误类型：`ClaudeSDKError` 等
 
 ## 阅读顺序建议
 
-1. `query.md`（先跑通一次性调用）
-2. `client.md`（需要多轮/可中断/动态发送消息时）
-3. `types.md`（你需要认真配 `ClaudeAgentOptions` 时）
-4. `__init__.md`（自定义工具、进程内 MCP）
-5. `errors.md`（上线前的异常处理）
+1. [query.md](query.md)（先跑通一次性调用）
+2. [client.md](client.md)（需要多轮/可中断/动态发送消息时）
+3. [types.md](types.md)（你需要认真配 `ClaudeAgentOptions` 时）
+4. [__init__.md](__init__.md)（自定义工具、进程内 MCP）
+5. [errors.md](errors.md)（上线前的异常处理）
 

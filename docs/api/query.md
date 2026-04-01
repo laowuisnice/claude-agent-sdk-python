@@ -30,7 +30,7 @@
 
 **返回**
 
-- `AsyncIterator[Message]`：异步迭代器，逐条产出消息对象（`Message` 是一个 union，见 `types.md`）。
+- `AsyncIterator[Message]`：异步迭代器，逐条产出消息对象（`Message` 是一个 union，见 [types.md](types.md)）。
 
 **内部流程（理解即可）**
 

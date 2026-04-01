@@ -64,7 +64,7 @@
 
 - 在你自己的脚本里，把这个函数改成：
   - 根据你的应用场景设置 `system_prompt`
-  - 按需设置 `max_turns`/其他选项（见 `docs/api/types.md`）。
+- 按需设置 `max_turns`/其他选项（见 [docs/api/types.md](../api/types.md)）。
 
 ---
 

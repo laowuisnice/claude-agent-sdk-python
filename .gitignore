@@ -50,3 +50,6 @@ htmlcov/
 dmypy.json
 .pyre/
 .claude/worktrees/
+
+# agent_demo runtime log (append-only)
+agent_demo/demo_log.txt
