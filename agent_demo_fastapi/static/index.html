@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Claude Agent SDK Demo</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <h1>对话</h1>
+        <button type="button" class="btn btn-primary" id="btn-new">新建对话</button>
+        <div class="conv-list" id="conv-list"></div>
+      </aside>
+      <section class="main">
+        <div class="permission-bar" id="permission-bar">
+          <div><strong>工具权限请求</strong> — 请确认是否允许执行。</div>
+          <pre id="permission-detail"></pre>
+          <div class="permission-actions">
+            <button type="button" class="btn btn-primary" id="btn-allow">允许</button>
+            <button type="button" class="btn" id="btn-deny">拒绝</button>
+          </div>
+        </div>
+        <div class="chat-area" id="chat-area"></div>
+        <div class="status" id="status"></div>
+        <div class="composer">
+          <textarea
+            id="input"
+            placeholder="输入消息…（Enter 发送，Shift+Enter 换行）"
+            rows="2"
+          ></textarea>
+          <button type="button" class="btn btn-primary btn-send" id="btn-send" title="发送 (Enter)">
+            &#8617;
+          </button>
+        </div>
+      </section>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
