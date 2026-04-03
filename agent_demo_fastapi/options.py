@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from claude_agent_sdk.types import ClaudeAgentOptions, PermissionMode
+from claude_agent_sdk.types import CanUseTool, ClaudeAgentOptions, PermissionMode
 
 from .permission_bridge import PermissionBridge
 
@@ -31,6 +31,7 @@ def _parse_list(s: str | None) -> list[str]:
 def build_claude_options(
     bridge: PermissionBridge,
     *,
+    can_use_tool_override: CanUseTool | None = None,
     cwd: str | Path | None = None,
     allowed_tools: str | None = None,
     disallowed_tools: str | None = None,
@@ -67,7 +68,7 @@ def build_claude_options(
     return ClaudeAgentOptions(
         include_partial_messages=True,
         max_turns=32,
-        can_use_tool=bridge.can_use_tool,
+        can_use_tool=can_use_tool_override or bridge.can_use_tool,
         cwd=cwd_path,
         allowed_tools=_parse_list(allowed_tools),
         disallowed_tools=_parse_list(disallowed_tools),

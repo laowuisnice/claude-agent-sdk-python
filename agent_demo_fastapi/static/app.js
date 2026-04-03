@@ -1,10 +1,9 @@
-/* global EventSource */
-
 const $ = (id) => document.getElementById(id);
 
 let activeConvId = null;
 let pollAbort = null;
 let pendingPermission = null;
+let permSaveTimer = null;
 
 function setStatus(text) {
   $("status").textContent = text || "";
@@ -21,6 +20,56 @@ async function api(path, options = {}) {
   }
   if (r.status === 204) return null;
   return r.json();
+}
+
+async function loadPermissionPrefs() {
+  const data = await api("/api/permission_prefs");
+  const p = data.permission_prefs || {};
+  const readEl = $("perm-read");
+  const bashEl = $("perm-bash");
+  const taskEl = $("perm-task");
+  const modeEl = $("perm-mode");
+  const patEl = $("perm-patterns");
+  if (!readEl || !bashEl || !taskEl || !modeEl || !patEl) return;
+  readEl.checked = !!p.auto_allow_read_tools;
+  bashEl.checked = !!p.auto_allow_safe_bash;
+  taskEl.checked = !!p.auto_allow_task;
+  modeEl.value = p.permission_mode == null ? "" : String(p.permission_mode);
+  patEl.value = Array.isArray(p.safe_bash_patterns)
+    ? p.safe_bash_patterns.join("\n")
+    : "";
+}
+
+function scheduleSavePermissionPrefs() {
+  if (permSaveTimer) clearTimeout(permSaveTimer);
+  permSaveTimer = setTimeout(() => {
+    savePermissionPrefs().catch((e) => setStatus(String(e)));
+  }, 300);
+}
+
+async function savePermissionPrefs() {
+  const readEl = $("perm-read");
+  const bashEl = $("perm-bash");
+  const taskEl = $("perm-task");
+  const modeEl = $("perm-mode");
+  const patEl = $("perm-patterns");
+  if (!readEl || !bashEl || !taskEl || !modeEl || !patEl) return;
+  const patterns = patEl.value
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const body = {
+    auto_allow_read_tools: readEl.checked,
+    auto_allow_safe_bash: bashEl.checked,
+    auto_allow_task: taskEl.checked,
+    permission_mode: modeEl.value === "" ? null : modeEl.value,
+    safe_bash_patterns: patterns,
+  };
+  await api("/api/permission_prefs", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+  setStatus("权限策略已保存");
 }
 
 function renderMessages(messages) {
@@ -226,4 +275,15 @@ $("input").addEventListener("keydown", (e) => {
   }
 });
 
-loadConversations().catch((e) => setStatus(String(e)));
+["perm-read", "perm-bash", "perm-task", "perm-mode"].forEach((id) => {
+  const el = $(id);
+  if (el) el.addEventListener("change", () => scheduleSavePermissionPrefs());
+});
+const permPatterns = $("perm-patterns");
+if (permPatterns) {
+  permPatterns.addEventListener("input", () => scheduleSavePermissionPrefs());
+}
+
+Promise.all([loadPermissionPrefs(), loadConversations()]).catch((e) =>
+  setStatus(String(e))
+);

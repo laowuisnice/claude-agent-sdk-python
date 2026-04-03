@@ -12,6 +12,36 @@
         <h1>对话</h1>
         <button type="button" class="btn btn-primary" id="btn-new">新建对话</button>
         <div class="conv-list" id="conv-list"></div>
+        <div class="permission-panel" id="permission-panel">
+          <h2 class="perm-title">权限策略</h2>
+          <p class="perm-hint">
+            减少只读/安全命令的重复确认；演示环境使用，Bash 白名单可被恶意拼接绕过。
+          </p>
+          <label class="perm-row"
+            ><input type="checkbox" id="perm-read" /> 自动允许 Read / Glob / Grep</label
+          >
+          <label class="perm-row"
+            ><input type="checkbox" id="perm-bash" /> 自动允许「安全」Bash（见下方白名单）</label
+          >
+          <label class="perm-row"
+            ><input type="checkbox" id="perm-task" /> 自动允许 Task 工具</label
+          >
+          <label class="perm-row perm-select">
+            <span>权限模式</span>
+            <select id="perm-mode">
+              <option value="">CLI 默认（安装选项）</option>
+              <option value="default">default</option>
+              <option value="acceptEdits">acceptEdits</option>
+              <option value="plan">plan</option>
+              <option value="bypassPermissions">bypassPermissions（高风险）</option>
+              <option value="dontAsk">dontAsk（高风险）</option>
+            </select>
+          </label>
+          <details class="perm-details">
+            <summary>Bash 白名单（每行一条前缀）</summary>
+            <textarea id="perm-patterns" rows="6" spellcheck="false"></textarea>
+          </details>
+        </div>
       </aside>
       <section class="main">
         <div class="permission-bar" id="permission-bar">

@@ -35,6 +35,7 @@ body {
   flex-direction: column;
   padding: 12px;
   gap: 8px;
+  min-height: 0;
 }
 
 .sidebar h1 {
@@ -77,10 +78,79 @@ body {
 
 .conv-list {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.permission-panel {
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #e4e4e7;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.perm-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.perm-hint {
+  margin: 0;
+  color: #71717a;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.perm-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  line-height: 1.35;
+}
+
+.perm-row input {
+  margin-top: 3px;
+}
+
+.perm-select {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  cursor: default;
+}
+
+.perm-select select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #d4d4d8;
+  font: inherit;
+}
+
+.perm-details summary {
+  cursor: pointer;
+  color: #3f3f46;
+}
+
+.perm-details textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #d4d4d8;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  resize: vertical;
+  box-sizing: border-box;
 }
 
 .conv-item {

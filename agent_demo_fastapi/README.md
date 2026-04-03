@@ -9,8 +9,8 @@
 ## 这个 Demo 在做什么？（概念）
 
 1. **前端（HTML + JS）**  
-   - 左侧：历史会话列表，可新建、切换会话。  
-   - 右侧上方：**权限/确认区**。当 Agent 要执行某个工具时，后端会把请求推到这里，你点「允许」或「拒绝」。  
+   - 左侧：**历史会话列表**（新建、切换），**最下方为「权限策略」面板**（自动放行只读工具、安全 Bash、Task，以及 `permission_mode`；修改后约 300ms 自动保存到服务端）。  
+   - 右侧上方：**权限/确认区**。当某次工具调用**未被策略自动放行**时，后端会把请求推到这里，你点「允许」或「拒绝」。  
    - 右侧中间：**对话区**，显示用户消息和助手回复（流式更新）。  
    - 底部：输入框 + 发送按钮（**Enter 发送**，Shift+Enter 换行）。
 
@@ -19,12 +19,13 @@
    - 通过 **`ClaudeAgentOptions(can_use_tool=...)`** 注册回调：每次 CLI 询问「是否允许某工具」时，回调会挂起，直到你在网页上点允许/拒绝（内部用 `asyncio.Future` 桥接 HTTP）。
 
 3. **数据**  
-   - 会话标题、消息列表等保存在本目录下的 **`data/conversations.json`**（首次运行后生成），写入采用临时文件再替换，减少损坏风险。  
+   - 会话标题、消息列表等保存在 **`data/conversations.json`**（首次运行后生成），写入采用临时文件再替换，减少损坏风险。  
+   - **全局权限策略**保存在 **`data/permission_prefs.json`**（勾选只读自动放行、Bash 白名单、`permission_mode` 等）。  
    - Agent 实际读写代码/执行命令的工作目录默认是 **`workspace/`**，避免直接动整个仓库根目录。
 
-4. **实时推送**  
-   - 使用 **SSE（Server-Sent Events）**：浏览器用 `EventSource` 连接 `GET /api/conversations/{id}/events`，服务端持续推送 JSON 事件（流式文本、权限请求、结束等）。  
-   - 发送消息、确认权限使用普通 **REST POST**。
+4. **实时事件**  
+   - 使用 **HTTP 短轮询**：`GET /api/conversations/{id}/events_poll`（默认约每 2 秒一轮），返回 JSON 事件列表（流式文本、权限请求、结束等），避免长时间占用连接。  
+   - 发送消息、确认权限、更新权限策略使用普通 **REST POST/PUT**。
 
 ---
 
@@ -49,12 +50,14 @@ agent_demo_fastapi/
 ├── README.md              # 本说明
 ├── 计划表.md              # SDK 公开 API 迭代清单（后续功能可对照勾选）
 ├── requirements.txt       # FastAPI / Uvicorn
-├── main.py                # FastAPI 路由、静态资源、SSE
+├── main.py                # FastAPI 路由、静态资源、轮询与权限 prefs API
 ├── agent_service.py       # ClaudeSDKClient 封装、多轮与流式、会话管理
 ├── permission_bridge.py   # 工具权限：Future + HTTP 允许/拒绝
+├── permission_policy.py   # 自动放行规则（在桥接 UI 之前）
+├── permission_prefs.py    # permission_prefs.json 读写与合并
 ├── options.py             # ClaudeAgentOptions 组装（cwd、partial messages 等）
 ├── storage.py             # JSON 读写与原子保存
-├── data/                  # conversations.json 存放处（可 gitignore）
+├── data/                  # conversations.json、permission_prefs.json（可 gitignore）
 ├── workspace/             # 交给 CLI 的默认工作目录（Agent 工具多作用于此）
 └── static/                # 前端
     ├── index.html
@@ -90,33 +93,38 @@ python -m agent_demo_fastapi.main
 ## 使用说明（界面流程）
 
 1. **新建对话**  
-   点击「新建对话」，左侧会出现新会话；此时会选中该会话并尝试建立 SSE 连接。
+   点击「新建对话」，左侧会出现新会话；此时会选中该会话并启动事件轮询。
 
 2. **切换会话**  
    点击左侧某条会话，会：  
    - 将该会话设为当前活跃会话；  
    - **断开其他会话在内存中的 CLI 连接**（节省资源）；  
-   - 从 JSON 加载历史消息并重新连接 SSE。
+   - 从 JSON 加载历史消息并重新连接轮询。
 
 3. **发送消息**  
    在底部输入文字，点发送按钮或按 **Enter**。  
-   用户消息会先显示在对话区，然后后端异步跑一轮 Agent；助手回复通过 SSE **流式**追加显示。
+   用户消息会先显示在对话区，然后后端异步跑一轮 Agent；助手回复通过轮询返回的事件 **流式**追加显示。
 
-4. **工具权限（重要）**  
-   当 Claude 要执行工具时，上方黄色 **权限条** 会出现工具名、参数摘要等。  
-   - 点 **允许**：当前这一次工具调用继续执行。  
-   - 点 **拒绝**：拒绝本次调用（具体行为以 SDK/CLI 为准）。  
-   若长时间不操作，服务端会对挂起的权限请求做**超时拒绝**（避免永久占住进程），详见 `permission_bridge.py` 中的超时设置。
+4. **左侧「权限策略」（减少重复点允许）**  
+   - **自动允许 Read / Glob / Grep**：只读类工具不再弹窗（在 `can_use_tool` 里直接 `PermissionResultAllow`）。  
+   - **自动允许安全 Bash**：仅当命令**整行**匹配 Bash 白名单前缀，且不含 `;`、`|`、`&&` 等（简易防拼接）；白名单可在折叠区按行编辑。  
+   - **自动允许 Task**：按需开启（部分场景下可减少子任务相关确认）。  
+   - **权限模式**：对应 SDK 的 `permission_mode`；保存后会对**已连接**的 CLI 调用 `set_permission_mode`（其中「CLI 默认」会设为 `default`）。`bypassPermissions` / `dontAsk` 权限极大，仅建议在隔离环境使用。  
 
-5. **建议操作顺序（避免漏事件）**  
-   先让页面完成**会话切换**（从而建立 SSE），再发送消息，这样流式与权限事件不会丢。若网络断开，SSE 可能中断，可刷新页面或重新点选会话。
+5. **工具权限条（仍需人工时）**  
+   当某次调用未被上述策略放行时，上方黄色 **权限条** 会出现工具名、参数摘要等。  
+   - 点 **允许** / **拒绝**：与原先一致。  
+   若长时间不操作，挂起请求会**超时拒绝**，详见 `permission_bridge.py`。
+
+6. **建议操作顺序**  
+   先完成**会话切换**（轮询已启动），再发送消息，这样事件更不容易漏。若异常可刷新页面或重新点选会话。
 
 ---
 
 ## 后端行为摘要（便于排查）
 
 - **多轮上下文**：首轮若 JSON 里已有历史，会把历史摘要注入到用户消息前（与 `examples/streaming_mode.py` 里「多轮」思路类似）；同一浏览器会话内 CLI 连接会复用，直到切换会话或进程退出。  
-- **`can_use_tool` 与 `connect()`**：启用权限回调时，SDK 要求**不能**用字符串形式在 `connect()` 里带初始 prompt；本 Demo 使用 `await client.connect()`（无字符串），再通过 `query(...)` 发消息。  
+- **`can_use_tool` 与 `connect()`**：启用权限回调时，SDK 要求**不能**用字符串形式在 `connect()` 里带初始 prompt；本 Demo 使用 `await client.connect()`（无字符串），再通过 `query(...)` 发消息。实际回调为 **策略自动放行** + **`PermissionBridge`（人工）** 两层。  
 - **工作目录**：`ClaudeAgentOptions(cwd=...)` 指向 `agent_demo_fastapi/workspace/`，请把「允许 Agent 改动的试验文件」放在该目录下更安全。  
 - **关闭服务**：Uvicorn 退出时，`lifespan` 会尝试 **disconnect** 所有 `ClaudeSDKClient`，并取消未决的权限等待。
 
@@ -126,6 +134,9 @@ python -m agent_demo_fastapi.main
 
 | 方法 | 路径 | 作用 |
 |------|------|------|
+| GET | `/healthz` | 健康检查（含 `shutting_down`） |
+| GET | `/api/permission_prefs` | 读取全局权限策略 |
+| PUT | `/api/permission_prefs` | 更新策略（部分字段即可），落盘并同步已连接 CLI 的 `permission_mode` |
 | GET | `/api/conversations` | 会话列表与当前 `active_id` |
 | POST | `/api/conversations` | 新建会话（可选 JSON body：`{"title": "..."}`） |
 | GET | `/api/conversations/{id}` | 单个会话详情（含 `messages`） |
@@ -133,15 +144,16 @@ python -m agent_demo_fastapi.main
 | POST | `/api/conversations/{id}/active` | 设为活跃并断开其他会话的 CLI |
 | POST | `/api/conversations/{id}/messages` | 发送用户消息，body：`{"text": "..."}` |
 | POST | `/api/conversations/{id}/permission` | 权限结果，body：`{"allow": true}` 或 `false` |
-| GET | `/api/conversations/{id}/events` | **SSE** 事件流 |
+| GET | `/api/conversations/{id}/events_poll` | **短轮询**事件，`since`、`timeout_sec` 查询参数 |
+| GET | `/api/conversations/{id}/events` | （可选）**SSE** 事件流，当前前端未使用 |
 
-SSE 每条 `data:` 后是一段 JSON，常见字段：  
+轮询返回体为 `{"events": [...], "next_since": n}`。`events` 中每条为 JSON 对象（带 `_seq`），常见 `type`：  
 
-- `type: "delta"`：助手当前累积文本（`text`）。  
-- `type: "permission_request"`：需要用户确认的工具调用。  
-- `type: "result"`：本轮结束及费用等信息。  
-- `type: "error"`：错误信息。  
-- `type: "done"`：本轮事件结束标记。
+- `delta`：助手当前累积文本（`text`）。  
+- `permission_request`：需要用户确认的工具调用。  
+- `result`：本轮结束及费用等信息。  
+- `error`：错误信息。  
+- `done`：本轮事件结束标记。
 
 ---
 

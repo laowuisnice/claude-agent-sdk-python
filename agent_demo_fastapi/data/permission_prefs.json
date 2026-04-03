@@ -1,0 +1,25 @@
+{
+  "permission_mode": null,
+  "auto_allow_read_tools": true,
+  "auto_allow_safe_bash": true,
+  "auto_allow_task": false,
+  "safe_bash_patterns": [
+    "ls",
+    "cd",
+    "pwd",
+    "echo",
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "find",
+    "stat",
+    "dir",
+    "where",
+    "type",
+    "git status",
+    "git branch",
+    "git log",
+    "git diff"
+  ]
+}

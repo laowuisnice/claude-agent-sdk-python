@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 from collections import deque
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -25,9 +26,11 @@ from claude_agent_sdk import (
     UserMessage,
 )
 from claude_agent_sdk._errors import CLIConnectionError
+from claude_agent_sdk.types import PermissionResultAllow, ToolPermissionContext
 
 from .options import build_claude_options
 from .permission_bridge import PermissionBridge
+from .permission_policy import should_auto_allow
 
 logger = logging.getLogger(__name__)
 
@@ -160,12 +163,11 @@ class ConversationSession:
         self,
         conversation_id: str,
         workspace_dir: Path,
-        *,
-        permission_mode: str | None = None,
+        prefs_getter: Callable[[], dict[str, Any]],
     ) -> None:
         self.conversation_id = conversation_id
         self._workspace = workspace_dir
-        self._permission_mode = permission_mode
+        self._prefs_getter = prefs_getter
 
         async def _on_pending(payload: dict[str, Any]) -> None:
             await self.emit(
@@ -180,6 +182,18 @@ class ConversationSession:
             )
 
         self._bridge = PermissionBridge(on_pending=_on_pending)
+
+        async def _can_use_tool_wrapped(
+            tool_name: str,
+            inp: dict[str, Any],
+            context: ToolPermissionContext,
+        ) -> Any:
+            prefs = self._prefs_getter()
+            if should_auto_allow(tool_name, inp, prefs):
+                return PermissionResultAllow()
+            return await self._bridge.can_use_tool(tool_name, inp, context)
+
+        self._can_use_tool_wrapped = _can_use_tool_wrapped
         self._client: ClaudeSDKClient | None = None
         self._history_injected = False
         self._connect_lock = asyncio.Lock()
@@ -248,10 +262,12 @@ class ConversationSession:
 
     def _options(self) -> ClaudeAgentOptions:
         self._workspace.mkdir(parents=True, exist_ok=True)
+        pm = self._prefs_getter().get("permission_mode")
         return build_claude_options(
             self._bridge,
+            can_use_tool_override=self._can_use_tool_wrapped,
             cwd=self._workspace,
-            permission_mode=self._permission_mode,
+            permission_mode=pm,
         )
 
     async def _ensure_client(self) -> ClaudeSDKClient:
@@ -264,6 +280,9 @@ class ConversationSession:
             self._client = client
             self._history_injected = False
             return client
+
+    def get_client(self) -> ClaudeSDKClient | None:
+        return self._client
 
     def clear_event_buffer(self) -> None:
         self._buffer.clear()
@@ -349,8 +368,17 @@ class ConversationSession:
 class SessionManager:
     """Maps conversation_id -> ConversationSession; disconnect others on focus."""
 
-    def __init__(self, workspace_dir: Path) -> None:
+    _VALID_PERM = frozenset(
+        {"default", "acceptEdits", "plan", "bypassPermissions", "dontAsk"}
+    )
+
+    def __init__(
+        self,
+        workspace_dir: Path,
+        prefs_getter: Callable[[], dict[str, Any]],
+    ) -> None:
         self._workspace = workspace_dir
+        self._prefs_getter = prefs_getter
         self._sessions: dict[str, ConversationSession] = {}
         self._lock = asyncio.Lock()
 
@@ -358,7 +386,9 @@ class SessionManager:
         async with self._lock:
             if conversation_id not in self._sessions:
                 self._sessions[conversation_id] = ConversationSession(
-                    conversation_id, self._workspace
+                    conversation_id,
+                    self._workspace,
+                    self._prefs_getter,
                 )
             return self._sessions[conversation_id]
 
@@ -380,3 +410,22 @@ class SessionManager:
             self._sessions.clear()
         for _, sess in items:
             await sess.disconnect()
+
+    async def apply_permission_mode_to_connected_clients(
+        self, mode: str | None
+    ) -> None:
+        """Call SDK set_permission_mode on every connected client (if any)."""
+        effective = "default" if mode is None else mode
+        if effective not in self._VALID_PERM:
+            logger.warning("ignore invalid permission_mode: %s", mode)
+            return
+        async with self._lock:
+            sessions = list(self._sessions.values())
+        for sess in sessions:
+            client = sess.get_client()
+            if client is None:
+                continue
+            try:
+                await client.set_permission_mode(effective)  # type: ignore[arg-type]
+            except (CLIConnectionError, OSError, RuntimeError, TypeError, ValueError) as e:
+                logger.warning("set_permission_mode failed: %s", e)

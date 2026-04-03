@@ -16,6 +16,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .agent_service import SessionManager
+from .permission_prefs import (
+    apply_patch,
+    default_permission_prefs_path,
+    load_permission_prefs,
+    save_permission_prefs,
+)
 from .storage import (
     default_store_path,
     delete_conversation,
@@ -37,6 +43,7 @@ STATIC_DIR = PACKAGE_DIR / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO)
+    app.state.permission_prefs = load_permission_prefs(default_permission_prefs_path())
     yield
     app.state.shutting_down = True
     # Cancel any background tasks created by request handlers so Ctrl+C can exit
@@ -51,9 +58,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Claude Agent SDK FastAPI Demo", lifespan=lifespan)
-app.state.session_manager = SessionManager(WORKSPACE_DIR)
 app.state.shutting_down = False
 app.state.bg_tasks = set()
+app.state.permission_prefs = load_permission_prefs(default_permission_prefs_path())
+app.state.session_manager = SessionManager(
+    WORKSPACE_DIR,
+    lambda: app.state.permission_prefs,
+)
 
 
 class CreateConversationBody(BaseModel):
@@ -68,6 +79,16 @@ class PermissionBody(BaseModel):
     allow: bool
 
 
+class PermissionPrefsUpdate(BaseModel):
+    """Partial update; omitted fields keep previous values."""
+
+    permission_mode: str | None = None
+    auto_allow_read_tools: bool | None = None
+    auto_allow_safe_bash: bool | None = None
+    auto_allow_task: bool | None = None
+    safe_bash_patterns: list[str] | None = None
+
+
 def _store() -> dict[str, Any]:
     return load_store(default_store_path())
 
@@ -79,6 +100,24 @@ def _save(data: dict[str, Any]) -> None:
 @app.get("/healthz")
 async def healthz() -> dict[str, Any]:
     return {"ok": True, "shutting_down": bool(getattr(app.state, "shutting_down", False))}
+
+
+@app.get("/api/permission_prefs")
+async def get_permission_prefs() -> dict[str, Any]:
+    return {"permission_prefs": app.state.permission_prefs}
+
+
+@app.put("/api/permission_prefs")
+async def put_permission_prefs(body: PermissionPrefsUpdate) -> dict[str, Any]:
+    patch = body.model_dump(exclude_unset=True)
+    new_prefs = apply_patch(app.state.permission_prefs, patch)
+    save_permission_prefs(new_prefs)
+    app.state.permission_prefs = new_prefs
+    sm: SessionManager = app.state.session_manager
+    await sm.apply_permission_mode_to_connected_clients(
+        new_prefs.get("permission_mode")
+    )
+    return {"permission_prefs": new_prefs}
 
 
 @app.get("/api/conversations")
